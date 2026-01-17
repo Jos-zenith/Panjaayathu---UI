@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Users, TrendingUp, Activity, AlertCircle } from "lucide-react";
-import { projectId, publicAnonKey } from "/utils/supabase/info";
+import { projectId, publicAnonKey } from "@/utils/supabase/info";
 
 interface AnalyticsData {
   totalUsers: number;
@@ -23,15 +23,17 @@ export function ProDashboard() {
     recentTrends: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalytics();
-    const interval = setInterval(loadAnalytics, 30000); // Refresh every 30 seconds
+    const interval = setInterval(loadAnalytics, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const loadAnalytics = async () => {
     try {
+      setError(null);
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-f9caf0ac/analytics`,
         {
@@ -40,21 +42,33 @@ export function ProDashboard() {
           },
         }
       );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load analytics: ${response.status}`);
+      }
+      
       const data = await response.json();
       setAnalytics(data);
     } catch (error) {
       console.error("Error loading analytics:", error);
+      setError(error instanceof Error ? error.message : "Failed to load analytics");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Transform data for charts
+  // Transform data for charts with proper error handling
   const chartData = (analytics.recentTrends || [])
-    .map((trend) => ({
-      date: new Date(trend.timestamp).toLocaleDateString(),
-      score: trend.score,
-    }))
+    .map((trend) => {
+      if (!trend || typeof trend.score !== 'number' || typeof trend.timestamp !== 'number') {
+        return null;
+      }
+      return {
+        date: new Date(trend.timestamp).toLocaleDateString(),
+        score: trend.score,
+      };
+    })
+    .filter((item): item is { date: string; score: number } => item !== null)
     .reduce((acc, curr) => {
       const existing = acc.find((item) => item.date === curr.date);
       if (existing) {
@@ -97,6 +111,18 @@ export function ProDashboard() {
             Anonymized well-being trends and insights
           </p>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <Card className="border-red-300 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-red-800">
+                <AlertCircle className="w-5 h-5" />
+                <p className="text-sm font-medium">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Key Metrics */}
         <div className="grid md:grid-cols-4 gap-4">
