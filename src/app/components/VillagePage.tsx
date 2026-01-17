@@ -4,7 +4,7 @@ import { VillageHouse } from "@/app/components/VillageHouse";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Checkbox } from "@/app/components/ui/checkbox";
-import { projectId, publicAnonKey } from "/utils/supabase/info";
+import { projectId, publicAnonKey } from "@/utils/supabase/info";
 
 interface Task {
   id: string;
@@ -43,11 +43,17 @@ export function VillagePage() {
           },
         }
       );
+      
+      if (!response.ok) {
+        console.error("Failed to load wellness data");
+        return;
+      }
+      
       const data = await response.json();
       if (data.score) {
         setWellnessScore(data.score);
       }
-      if (data.tasks) {
+      if (data.tasks && Array.isArray(data.tasks)) {
         setTasks(data.tasks);
       }
     } catch (error) {
@@ -88,7 +94,7 @@ export function VillagePage() {
       const newScore = Math.min(100, 30 + (completedCount / newTasks.length) * 70);
       setWellnessScore(Math.round(newScore));
       
-      // Update streak
+      // Update streak if all tasks completed
       if (newTasks.every((t) => t.completed)) {
         setStreak((prev) => prev + 1);
       }
@@ -97,11 +103,28 @@ export function VillagePage() {
     });
   };
 
+  // FIXED: Safe calculation with proper filtering
   const categoryScores = {
-    mind: tasks.filter(t => t.category === "mind" && t.completed).length / tasks.filter(t => t.category === "mind").length * 100 || 0,
-    body: tasks.filter(t => t.category === "body" && t.completed).length / tasks.filter(t => t.category === "body").length * 100 || 0,
-    relationships: tasks.filter(t => t.category === "relationships" && t.completed).length / tasks.filter(t => t.category === "relationships").length * 100 || 0,
-    soul: tasks.filter(t => t.category === "soul" && t.completed).length / tasks.filter(t => t.category === "soul").length * 100 || 0,
+    mind: (() => {
+      const mindTasks = tasks.filter(t => t.category === "mind");
+      const completedMind = mindTasks.filter(t => t.completed).length;
+      return mindTasks.length > 0 ? (completedMind / mindTasks.length) * 100 : 0;
+    })(),
+    body: (() => {
+      const bodyTasks = tasks.filter(t => t.category === "body");
+      const completedBody = bodyTasks.filter(t => t.completed).length;
+      return bodyTasks.length > 0 ? (completedBody / bodyTasks.length) * 100 : 0;
+    })(),
+    relationships: (() => {
+      const relTasks = tasks.filter(t => t.category === "relationships");
+      const completedRel = relTasks.filter(t => t.completed).length;
+      return relTasks.length > 0 ? (completedRel / relTasks.length) * 100 : 0;
+    })(),
+    soul: (() => {
+      const soulTasks = tasks.filter(t => t.category === "soul");
+      const completedSoul = soulTasks.filter(t => t.completed).length;
+      return soulTasks.length > 0 ? (completedSoul / soulTasks.length) * 100 : 0;
+    })(),
   };
 
   return (
