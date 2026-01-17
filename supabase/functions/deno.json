@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "hono": "npm:hono@4",
+    "hono/cors": "npm:hono@4/cors",
+    "hono/logger": "npm:hono@4/logger",
+    "@google/generative-ai": "npm:@google/generative-ai@0.21.0",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2.49.8"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom"]
+  }
+}
