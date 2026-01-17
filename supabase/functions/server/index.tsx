@@ -14,7 +14,7 @@ app.use(
     origin: "*",
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "OPTIONS"],
-  }),
+  })
 );
 
 /* -------------------- HEALTH -------------------- */
@@ -79,18 +79,18 @@ app.post("/make-server-f9caf0ac/chat", async (c) => {
       model: "gemini-1.5-pro",
     });
 
-    const systemPrompt = `
-You are a compassionate mental wellness coach for Indian family dynamics.
+    const systemPrompt = `You are a compassionate mental wellness coach for Indian family dynamics.
 Be empathetic, culturally sensitive, and non-judgmental.
 Encourage communication over separation.
-`;
+Keep responses concise and supportive.`;
 
     const result = await model.generateContent(
-      `${systemPrompt}\nUser: ${message}`,
+      `${systemPrompt}\n\nUser: ${message}`
     );
 
     const response = result.response.text();
 
+    // Save chat history
     await kv.set(`chat:${userId}:${Date.now()}`, {
       message,
       response,
@@ -99,11 +99,12 @@ Encourage communication over separation.
 
     return c.json({ response });
   } catch (e: any) {
+    console.error("Chat error:", e);
     return c.json({ error: e?.message ?? "Internal error" }, 500);
   }
 });
 
-/* -------------------- ANALYTICS (FIXED & TYPE-SAFE) -------------------- */
+/* -------------------- ANALYTICS (FIXED) -------------------- */
 app.get("/make-server-f9caf0ac/analytics", async (c) => {
   try {
     const rows = await kv.getByPrefix("wellness:");
@@ -117,13 +118,17 @@ app.get("/make-server-f9caf0ac/analytics", async (c) => {
       });
     }
 
+    // FIXED: Now properly destructures key and value from rows
     const trends = rows
-      .map((r) => {
-        if (!r || !r.key || !r.value) return null;
+      .map((row) => {
+        if (!row || !row.key || !row.value) return null;
 
-        const userId = r.key.split(":")[1];
-        const score = r.value.score;
-        const timestamp = r.value.timestamp;
+        // Extract userId from key (format: "wellness:userId")
+        const parts = row.key.split(":");
+        if (parts.length < 2) return null;
+        
+        const userId = parts[1];
+        const { score, timestamp } = row.value;
 
         if (
           typeof userId !== "string" ||
@@ -137,8 +142,17 @@ app.get("/make-server-f9caf0ac/analytics", async (c) => {
       })
       .filter(
         (t): t is { userId: string; score: number; timestamp: number } =>
-          t !== null,
+          t !== null
       );
+
+    if (trends.length === 0) {
+      return c.json({
+        totalUsers: 0,
+        averageScore: 50,
+        weeklyAverage: 50,
+        recentTrends: [],
+      });
+    }
 
     const totalUsers = new Set(trends.map((t) => t.userId)).size;
 
@@ -162,6 +176,7 @@ app.get("/make-server-f9caf0ac/analytics", async (c) => {
         .slice(0, 20),
     });
   } catch (e: any) {
+    console.error("Analytics error:", e);
     return c.json({ error: e?.message ?? "Internal error" }, 500);
   }
 });
